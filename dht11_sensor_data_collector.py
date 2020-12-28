@@ -2,143 +2,179 @@
 # -*- coding: utf-8 -*-
 """Script to test if the DHT 11 Sensor works
 Author: Lorenzo Pedroza
-Date 12/15/2020
+Date 12/28/2020
 """
 
-import adafruit_dht
 import time
 import sys
-import gpiozero
 import csv
-import pushbullet
 import os
+import gpiozero
+import adafruit_dht
+import pushbullet
 
-DHT_SENSOR = None
-BUZZER = None
+ #These values are globally accessbile
 push_bullet = pushbullet.PushBullet(os.environ['PUSHBULLET_API_ACCESS_TOKEN']) #access token
 my_phone = push_bullet.get_device(os.environ['PUSHBULLET_API_PHONE_NAME'])
 
+def play_start_tone(buzzer: gpiozero.TonalBuzzer):
+    """Plays the program start tone on the buzzer
 
-SAMPLE_TIME = None #seconds
-SAMPLES_NEEDED = None
-USE_PUSH_BULLET = False
-start_time = None
-end_time = None
-
-def start_tone():
-    #start tone
-    global BUZZER
-    BUZZER.play(gpiozero.tones.Tone('G5'))
+    Args:
+        buzzer (gpiozero.TonalBuzzer): The buzzer to play the tone with
+    """
+    buzzer.play(gpiozero.tones.Tone('G5'))
     time.sleep(0.5)
-    BUZZER.stop()
+    buzzer.stop()
     time.sleep(0.1)
-    BUZZER.play(gpiozero.tones.Tone('A5'))
+    buzzer.play(gpiozero.tones.Tone('A5'))
     time.sleep(0.3)
-    BUZZER.stop()
+    buzzer.stop()
 
-def sensor_error_tone():
-    global BUZZER
-    BUZZER.play(gpiozero.tones.Tone('F4'))
-    time.sleep(0.5)
-    BUZZER.stop()
-    time.sleep(0.1)
-    BUZZER.play(gpiozero.tones.Tone('B4'))
-    time.sleep(0.3)
-    BUZZER.stop()
+def play_sensor_error_tone(buzzer: gpiozero.TonalBuzzer):
+    """Plays the program sensor error tone on the buzzer
 
-def file_error_tone():
-    global BUZZER
-    BUZZER.play(gpiozero.tones.Tone('C4'))
+    Args:
+        buzzer (gpiozero.TonalBuzzer): The buzzer to play the tone with
+    """
+    buzzer.play(gpiozero.tones.Tone('F4'))
     time.sleep(0.5)
-    BUZZER.stop()
+    buzzer.stop()
     time.sleep(0.1)
-    BUZZER.play(gpiozero.tones.Tone('C4'))
+    buzzer.play(gpiozero.tones.Tone('B4'))
     time.sleep(0.3)
-    BUZZER.stop()
+    buzzer.stop()
 
-def done_tone():
-    #start tone
-    global BUZZER
-    BUZZER.play(gpiozero.tones.Tone('F5'))
+def play_file_error_tone(buzzer: gpiozero.TonalBuzzer):
+    """Plays the program file error tone on the buzzer
+
+    Args:
+        buzzer (gpiozero.TonalBuzzer): The buzzer to play the tone with
+    """
+    buzzer.play(gpiozero.tones.Tone('C4'))
     time.sleep(0.5)
-    BUZZER.stop()
+    buzzer.stop()
     time.sleep(0.1)
-    BUZZER.play(gpiozero.tones.Tone('A3'))
+    buzzer.play(gpiozero.tones.Tone('C4'))
     time.sleep(0.3)
-    BUZZER.stop()
+    buzzer.stop()
+
+def play_done_tone(buzzer: gpiozero.TonalBuzzer):
+    """Plays the program done tone on the buzzer
+
+    Args:
+        buzzer (gpiozero.TonalBuzzer): The buzzer to play the tone with
+    """
+    buzzer.play(gpiozero.tones.Tone('F5'))
+    time.sleep(0.5)
+    buzzer.stop()
+    time.sleep(0.1)
+    buzzer.play(gpiozero.tones.Tone('A3'))
+    time.sleep(0.3)
+    buzzer.stop()
+
+def collect_sample(dht_sensor: adafruit_dht.DHTBase, writer: csv.writer, next_sample_number: int):
+    """Records the values of the dht sensor using a csv _writer. Prints result to console
+
+    Args:
+        dht11_sensor (adafruit_dht.DHTBase): The DHT sensor
+        writer (csv.writer): The csv.writer to record the sensor data
+    """
+    humidity, temperature = dht_sensor.humidity, dht_sensor.temperature
+    print(f"Sample# {next_sample_number} {time.strftime('%H:%M:%S')} {time.strftime('%D')}"
+          f"Temp={temperature}C   Humidity={humidity}%", end='\r')
+    writer.writerow((time.strftime('%D'),
+                     time.strftime('%H:%M:%S'),
+                     temperature,
+                     humidity))
+
+def notify_failure(buzzer: gpiozero.TonalBuzzer, use_pushbullet: bool):
+    """Notifies user via buzzer, termianl message, and phone if specified of failure
+
+    Args:
+        buzzer (gpiozero.TonalBuzzer): The buzzer to play the tone with
+        use_pushbullet (bool): Whether to notify user with pushbullet
+    """
+    play_sensor_error_tone(buzzer)
+    print('\nSensor failure. Check wiring.')
+    if use_pushbullet:
+        my_phone.push_note('Temp and Humidity Test', 'Sensor failure check wirring')
+
+def notify_done(buzzer: gpiozero.TonalBuzzer, use_pushbullet: bool):
+    """Notifies user via buzzer, termianl message, and phone if specified of failure
+
+    Args:
+        buzzer (gpiozero.TonalBuzzer): The buzzer to play the tone with
+        use_pushbullet (bool): Whether to notify user with pushbullet
+    """
+    play_done_tone(buzzer)
+    print('\nFinished succesfully')
+    if use_pushbullet:
+        my_phone.push_note('Temp and Humidity Test', 'Done')
 
 def main():
+    """The main program"""
     if len(sys.argv) != 7:
-        sys.exit('Usage python dht11_sensor_data_collector.py <outfile.csv> <amount of sample to collect>\
-                 <time to run (in minutes)> <sensor pin> <speaker pin> <use Pushbullet (-y or -n)>')
-    
-    global BUZZER
-    global DHT_SENSOR
-    global start_time
-    global end_time
-    global USE_PUSH_BULLET
-  
-    outfile_name = sys.argv[1]
-    SAMPLES_NEEDED = int(sys.argv[2])  
-    #convert time given in minutes to seconds
-    TIME_TO_RUN = float(sys.argv[3])*60
-    SAMPLE_FREQUENCY = TIME_TO_RUN/SAMPLES_NEEDED
-    dht_pin = int(sys.argv[4])
-    DHT_SENSOR = adafruit_dht.DHT11(dht_pin)
-    buzzer_pin = int(sys.argv[5])
-    BUZZER = gpiozero.TonalBuzzer(buzzer_pin)
-    USE_PUSH_BULLET = True if sys.argv[6] == '-y' else False    
+        sys.exit('Usage python dht11_sensor_data_collector.py <outfile_name.csv>'
+                 ' <amount of sample to collect> <time to run (in minutes)>'
+                 ' <sensor pin> <speaker pin> <use Pushbullet (-y or -n)>')
 
-    #due to python stuff I guess, not always going to get reading
+    outfile_name = sys.argv[1]
+    samples_needed = int(sys.argv[2])
+    #convert time given in minutes to seconds
+    time_to_run = float(sys.argv[3])*60
+    sample_frequency = time_to_run/samples_needed
+    dht11_pin = int(sys.argv[4])
+    dht11_sensor = adafruit_dht.DHT11(dht11_pin)
+    buzzer_pin = int(sys.argv[5])
+    buzzer = gpiozero.TonalBuzzer(buzzer_pin)
+    use_push_bullet = sys.argv[6] == '-y'
+    start_time = None
+    end_time = None
+    outfile = None
+
     try:
+        #Initialize File Recording
         outfile = open(outfile_name, 'w')
         writer = csv.writer(outfile)
         writer.writerow(('Date', 'Time', 'Temperatre (C)', 'Relative Humidity (%)'))
-        
-        start_tone()#program succesfully started
-        print(f'Samples to Collect: {SAMPLES_NEEDED}, Time to run {TIME_TO_RUN/60}min, Sample Frequency: {SAMPLE_FREQUENCY}s')
+        #Notify user of program start
+        play_start_tone(buzzer)
+        print(f"Samples to Collect: {samples_needed}, Time to run {time_to_run/60}min, "
+              f"Sample Frequency: {sample_frequency}s")
         start_time = f"{time.strftime('%H:%M:%S')} {time.strftime('%D')}"
-        if USE_PUSH_BULLET:
+        if use_push_bullet:
             my_phone.push_note('Temp and Humidity Test', 'Started')
-        
+        #Collect samples
         samples = 0
-        while samples < SAMPLES_NEEDED:
+        while samples < samples_needed:
             try:
-                humidity, temperature = DHT_SENSOR.humidity, DHT_SENSOR.temperature
-                print(f"Sample# {samples+1} {time.strftime('%H:%M:%S')} {time.strftime('%D')} Temp={temperature}C   Humidity={humidity}%", end='\r')
-                #f'Time={time.strftime('%D')} {time.strftime('%H:%M:%S')}  Temp={temperature}C   Humidity={humidity}%'
-                writer.writerow((time.strftime('%D'), time.strftime('%H:%M:%S'), temperature, humidity))
+                collect_sample(dht11_sensor, writer, samples+1)
                 samples += 1
-            
+
             except RuntimeError as error:
                 if error.args[0] == 'DHT sensor not found, check wiring':
-                    sensor_error_tone()
-                    print('\nSensor failure. Check wiring.')
-                    if USE_PUSH_BULLET:
-                        my_phone.push_note('Temp and Humidity Test', 'Sensor failure check wirring')
-                        
-            end_time = f"{time.strftime('%H:%M:%S')} {time.strftime('%D')}"
-            time.sleep(SAMPLE_FREQUENCY)
+                    notify_failure(buzzer, use_push_bullet)
 
-        print('\nFinished succesfully')
-        if USE_PUSH_BULLET:
-            my_phone.push_note('Temp and Humidity Test', 'Done')
-        done_tone()
+            end_time = f"{time.strftime('%H:%M:%S')} {time.strftime('%D')}"
+            time.sleep(sample_frequency)
+        #Notify user of program completion
+        notify_done(buzzer, use_push_bullet)
 
     except IOError:
-        file_error_tone()
+        play_file_error_tone(buzzer)
         print(f'Could not open {outfile_name}')
 
     except KeyboardInterrupt:
-        print(f'\nProgram stopped by user')
+        print('\nProgram stopped by user')
 
     finally:
-        if DHT_SENSOR: #if sensor started
-            DHT_SENSOR.exit()
+        dht11_sensor.exit()
         if outfile: #if file was made
             outfile.close()
         if start_time and end_time:
-            print(f'{samples} samples recorded in {outfile_name}, Started {start_time}, Finished {end_time}')
+            print(f"{samples} samples recorded in {outfile_name}"
+                  f" Started {start_time}, Finished {end_time}")
 
 if __name__ == "__main__":
     main()
