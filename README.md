@@ -13,7 +13,7 @@ A Python Script for the Raspberry Pi that collects data from a DHT11 Sensor and 
 1. Clone this repository and change into its directory.
 2. Run `$ pipenv install` to install dependencies.
 3. Copy `.env_sample` and rename it to `.env`.
-    1. Create a Pushbullet access token [(find it in Account Settings)](https://www.pushbullet.com/#settings/account) and add it where specified in the `.env` file (Make a PushBullet acount if you don't have on already). ***Never publish sensitive informaiton like API tokens on public sites like GitHub. The `.gitignore` file prevents Git from committing the `.env` file for this reason***
+    1. Create a Pushbullet access token [(find it in Account Settings)](https://www.pushbullet.com/#settings/account) and add it where specified in the `.env` file (Make a PushBullet acount if you don't have one already). ***Never publish sensitive informaiton like API tokens on public sites like GitHub. The `.gitignore` file prevents Git from committing the `.env` file for this reason.***
     2. Download the PushBullet app on the device you would like to recieve notifcations on. Sign in to the same account. Make note of the name of the device on your account. 
     2. Add the name of the device you intend to send notications where specified in `.env` file.
 
@@ -32,4 +32,4 @@ A Python Script for the Raspberry Pi that collects data from a DHT11 Sensor and 
  *This fourth line in the above snippet updates to show the last sample collected*
  
  2. Use `Ctrl+c` or the equivalent to invoke a `Keyboard Interrupt` to manually stop the program.
- 3. If a sensor failure occurs you will be notified on Pushbullet and in the shell.
+ 3. If a sensor failure occurs you will be notified on Pushbullet and in the terminal.
