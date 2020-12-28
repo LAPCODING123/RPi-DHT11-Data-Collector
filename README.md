@@ -29,7 +29,7 @@ A Python Script for the Raspberry Pi that collects data from a DHT11 Sensor and 
     De-initializing self.pulse_in
     10 samples recorded in test.csv, Started 09:55:33 12/27/20, Finished 09:57:36 12/27/20
  
- *This fourth line in te above snippet updates to show the last sample collected*
+ *This fourth line in the above snippet updates to show the last sample collected*
  
  2. Use `Ctrl+c` or the equivalent to invoke a `Keyboard Interrupt` to manually stop the program.
  3. If a sensor failure occurs you will be notified on Pushbullet and in the shell.
